@@ -1,0 +1,189 @@
+# Solace Agent Mesh Agent Configuration
+
+log:
+  stdout_log_level: INFO
+  log_file_level: DEBUG
+  log_file: a2a_agent.log
+
+!include ../shared_config.yaml
+
+apps:
+  - name: "GetAllQualityResults.__app"
+    app_base_path: .
+    app_module: solace_agent_mesh.agent.sac.app
+    broker:
+      <<: *broker_connection
+
+    app_config:
+      namespace: "${NAMESPACE}"
+      supports_streaming: true
+      agent_name: "GetAllQualityResults"
+      display_name: "Get all quality results"
+      model: *general_model 
+
+      instruction: |
+        Returns a list of all quality inspection results in the SECOM MES database.
+      
+      tools: 
+        - component_base_path: .
+          component_module: src.quality.quality_api
+          function_name: get_all_results
+          tool_description: Returns a list of all quality inspection results in the SECOM MES database.
+          tool_name: get_all_results
+          tool_type: python
+
+      session_service: 
+        type: "sql"
+        default_behavior: "PERSISTENT"
+        database_url: "${GET_ALL_OPERATORS._DATABASE_URL, sqlite:///get_all_results.db}"
+      artifact_service: *default_artifact_service
+      
+      artifact_handling_mode: "reference"
+      enable_embed_resolution: true
+      enable_artifact_content_instruction: true
+      data_tools_config: *default_data_tools_config
+
+      # Agent Card Definition
+      agent_card:
+        description: |
+          Returns a list of all quality inspection results in the SECOM MES database.
+        defaultInputModes: [object] 
+        defaultOutputModes: [object] 
+        skills: 
+          - description: 'Retrieves a complete list of all quality inspection results in the system.
+                 Returns comprehensive quality data including all inspection records with
+                 their full details for analysis and reporting.'
+            id: get_all_results
+            name: Get All Quality Results
+            input_schema:
+              type: object
+              properties:
+                page:
+                  type: integer
+                  format: int32
+                  description: Page number for pagination (0-based index)
+                  default: 0
+                size:
+                  type: integer
+                  format: int32
+                  description: Number of results per page
+                  default: 20
+
+            output_schema:
+              type: object
+              description: Paginated response containing quality results
+              properties:
+                totalPages:
+                  type: integer
+                  format: int32
+                  description: Total number of pages
+                totalElements:
+                  type: integer
+                  format: int64
+                  description: Total number of elements
+                size:
+                  type: integer
+                  format: int32
+                  description: Page size
+                number:
+                  type: integer
+                  format: int32
+                  description: Current page number (0-based)
+                content:
+                  type: array
+                  description: Array of quality results
+                  items:
+                    type: object
+                    properties:
+                      resultId:
+                        type: integer
+                        format: int32
+                        description: Unique quality result identifier
+                      lot:
+                        type: object
+                        description: Associated lot information
+                      classification:
+                        type: integer
+                        format: int32
+                        description: Classification result (-1 = Pass, 1 = Fail)
+                      testTimestampRaw:
+                        type: string
+                        description: Raw test timestamp string
+                      testDatetime:
+                        type: string
+                        format: date-time
+                        description: Date and time of test
+                      predictedRisk:
+                        type: number
+                        format: float
+                        description: Predicted risk score (0.0 to 1.0)
+                      riskScore:
+                        type: number
+                        format: float
+                        description: Risk score
+                      riskFactors:
+                        type: string
+                        description: Risk factors identified
+                      modelVersion:
+                        type: string
+                        description: ML model version used for prediction
+                      qualityScore:
+                        type: number
+                        format: float
+                        description: Quality score
+                      defectType:
+                        type: string
+                        description: Type of defect
+                      defectCode:
+                        type: string
+                        description: Defect code
+                      defectLocation:
+                        type: string
+                        description: Location of defect
+                      inspector:
+                        type: object
+                        description: Inspector operator information
+                      notes:
+                        type: string
+                        description: Inspection notes
+                      reviewer:
+                        type: object
+                        description: Reviewer operator information
+                      reviewedAt:
+                        type: string
+                        format: date-time
+                        description: Review timestamp
+                      disposition:
+                        type: string
+                        description: Disposition decision
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: Record creation timestamp
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        description: Record update timestamp
+                numberOfElements:
+                  type: integer
+                  format: int32
+                  description: Number of elements in current page
+                first:
+                  type: boolean
+                  description: Whether this is the first page
+                last:
+                  type: boolean
+                  description: Whether this is the last page
+                empty:
+                  type: boolean
+                  description: Whether the page is empty
+      
+      # Discovery & Communication
+      agent_card_publishing: 
+        interval_seconds: 10
+      agent_discovery: 
+        enabled: true
+      inter_agent_communication:
+        allow_list: []
+        deny_list: [] 
+        request_timeout_seconds: 600

@@ -1,0 +1,2 @@
+httpx
+solace-agent-mesh~=1.7.5

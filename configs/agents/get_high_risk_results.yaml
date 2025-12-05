@@ -1,0 +1,98 @@
+# Solace Agent Mesh Agent Configuration
+
+log:
+  stdout_log_level: INFO
+  log_file_level: DEBUG
+  log_file: a2a_agent.log
+
+!include ../shared_config.yaml
+
+apps:
+  - name: "GetHighRiskQualityResult.__app"
+    app_base_path: .
+    app_module: solace_agent_mesh.agent.sac.app
+    broker:
+      <<: *broker_connection
+
+    app_config:
+      namespace: "${NAMESPACE}"
+      supports_streaming: true
+      agent_name: "GetHighRiskQualityResults"
+      display_name: "Get High Risk Quality Results"
+      model: *general_model 
+
+      instruction: |
+        Returns all quality inspection results with high risk level from the SECOM MES database.
+      
+      tools: 
+        - component_base_path: .
+          component_module: src.quality.quality_api
+          function_name: get_high_risk_results
+          tool_description: Returns all quality inspection results with high risk level from the SECOM MES database.
+          tool_name: get_high_risk_results
+          tool_type: python
+
+      session_service: 
+        type: "sql"
+        default_behavior: "PERSISTENT"
+        database_url: "${GET_ALL_OPERATORS._DATABASE_URL, sqlite:///get_high_risk_results.db}"
+      artifact_service: *default_artifact_service
+      
+      artifact_handling_mode: "reference"
+      enable_embed_resolution: true
+      enable_artifact_content_instruction: true
+      data_tools_config: *default_data_tools_config
+
+      # Agent Card Definition
+      agent_card:
+        description: |
+          Returns all quality inspection results with high risk level from the SECOM MES database.
+        defaultInputModes: [object] 
+        defaultOutputModes: [object] 
+        skills: 
+          - description: 'Retrieves all quality inspection results where the risk level is "High".
+                 Critical for identifying lots that require immediate attention, root cause
+                 analysis, or additional quality measures.'
+            id: get_high_risk_results
+            name: Get High Risk Quality Results
+            input_schema:
+              type: object
+              properties: {}
+
+            output_schema:
+              type: object
+              properties:
+                total_results:
+                  type: integer
+                  description: Total number of quality results
+                passed_count:
+                  type: integer
+                  description: Number of passed inspections (classification = -1)
+                failed_count:
+                  type: integer
+                  description: Number of failed inspections (classification = 1)
+                high_risk_count:
+                  type: integer
+                  description: Number of high risk results (predictedRisk > 0.7)
+                pass_rate:
+                  type: number
+                  format: float
+                  description: Percentage of passed inspections
+                average_quality_score:
+                  type: number
+                  format: float
+                  description: Average qualityScore across all results
+                statistics_generated_at:
+                  type: string
+                  format: date-time
+                  description: ISO 8601 timestamp when statistics were generated
+      
+      # Discovery & Communication
+      agent_card_publishing: 
+        interval_seconds: 10
+      agent_discovery: 
+        enabled: true
+      inter_agent_communication:
+        allow_list: []
+        deny_list: [] 
+        request_timeout_seconds: 600

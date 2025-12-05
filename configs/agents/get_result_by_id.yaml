@@ -1,0 +1,152 @@
+# Solace Agent Mesh Agent Configuration
+
+log:
+  stdout_log_level: INFO
+  log_file_level: DEBUG
+  log_file: a2a_agent.log
+
+!include ../shared_config.yaml
+
+apps:
+  - name: "GetQualityResultByID.__app"
+    app_base_path: .
+    app_module: solace_agent_mesh.agent.sac.app
+    broker:
+      <<: *broker_connection
+
+    app_config:
+      namespace: "${NAMESPACE}"
+      supports_streaming: true
+      agent_name: "GetQualityResultByID"
+      display_name: "Get quality result by ID"
+      model: *general_model 
+
+      instruction: |
+        Returns a single quality inspection result by result ID from the SECOM MES database.
+      
+      tools: 
+        - component_base_path: .
+          component_module: src.quality.quality_api
+          function_name: get_result_by_id
+          tool_description: Returns a single quality inspection result by result ID from the SECOM MES database.
+          tool_name: get_result_by_id
+          tool_type: python
+
+      session_service: 
+        type: "sql"
+        default_behavior: "PERSISTENT"
+        database_url: "${GET_ALL_OPERATORS._DATABASE_URL, sqlite:///get_result_by_id.db}"
+      artifact_service: *default_artifact_service
+      
+      artifact_handling_mode: "reference"
+      enable_embed_resolution: true
+      enable_artifact_content_instruction: true
+      data_tools_config: *default_data_tools_config
+
+      # Agent Card Definition
+      agent_card:
+        description: |
+          Returns a single quality inspection result by result ID from the SECOM MES database.
+        defaultInputModes: [object] 
+        defaultOutputModes: [object] 
+        skills: 
+          - description: 'Retrieves detailed information about a specific quality inspection result
+                 using its unique result ID. Returns complete quality data including
+                 inspection details, defect information, yield percentage, and risk level.'
+            id: get_result_by_id
+            name: Get Quality Result by ID
+            input_schema:
+              type: object
+              required:
+                - result_id
+              properties:
+                result_id:
+                  type: integer
+                  format: int32
+                  description: Unique identifier for the quality result
+                  example: 1
+
+            output_schema:
+              type: object
+              description: Quality result object
+              properties:
+                resultId:
+                  type: integer
+                  format: int32
+                  description: Unique quality result identifier
+                lot:
+                  type: object
+                  description: Associated lot information with lotId, lotNumber, productType, equipment, operator, shift, status
+                classification:
+                  type: integer
+                  format: int32
+                  description: Classification result (-1 = Pass, 1 = Fail)
+                testTimestampRaw:
+                  type: string
+                  description: Raw test timestamp string
+                testDatetime:
+                  type: string
+                  format: date-time
+                  description: Date and time of test
+                predictedRisk:
+                  type: number
+                  format: float
+                  description: Predicted risk score (0.0 to 1.0)
+                riskScore:
+                  type: number
+                  format: float
+                  description: Risk score
+                riskFactors:
+                  type: string
+                  description: Risk factors identified
+                modelVersion:
+                  type: string
+                  description: ML model version used for prediction
+                qualityScore:
+                  type: number
+                  format: float
+                  description: Quality score
+                defectType:
+                  type: string
+                  description: Type of defect (contamination, dimensional_oor, electrical_fail, surface_defect)
+                defectCode:
+                  type: string
+                  description: Defect code
+                defectLocation:
+                  type: string
+                  description: Location of defect
+                inspector:
+                  type: object
+                  description: Inspector operator information
+                notes:
+                  type: string
+                  description: Inspection notes
+                reviewer:
+                  type: object
+                  description: Reviewer operator information
+                reviewedAt:
+                  type: string
+                  format: date-time
+                  description: Review timestamp
+                disposition:
+                  type: string
+                  description: Disposition decision
+                createdAt:
+                  type: string
+                  format: date-time
+                  description: Record creation timestamp
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: Record update timestamp
+
+
+        # Discovery & Communication
+      agent_card_publishing: 
+        interval_seconds: 10
+      agent_discovery: 
+        enabled: true
+      inter_agent_communication:
+        allow_list: []
+        deny_list: [] 
+        request_timeout_seconds: 600

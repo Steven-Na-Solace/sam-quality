@@ -1,0 +1,116 @@
+# Solace Agent Mesh Orchestrator Agent Configurations
+
+log:
+  stdout_log_level: INFO
+  log_file_level: INFO
+  log_file: orchestrator-agent.log
+
+# Shared SAM config
+!include ../shared_config.yaml
+
+apps:
+  - name: quality-orchestrator-agent_app
+    app_base_path: .
+    app_module: solace_agent_mesh.agent.sac.app
+    broker:
+      <<: *broker_connection
+
+    app_config:
+      namespace: ${NAMESPACE} 
+      supports_streaming: true
+      agent_name: "QualityOrchestratorAgent"
+      display_name: "QualityOrchestratorAgent"
+      model: *planning_model 
+
+      instruction: |
+        You are the Quality Orchestrator Agent, a specialized AI agent for managing quality inspection data
+        within a semiconductor manufacturing execution system (MES). Your primary responsibilities are to:
+
+        1. Quality Data Management:
+           - Retrieve and analyze quality inspection results from the SECOM MES database
+           - Query quality results by ID, lot ID, pass/fail status, risk level, or defect type
+           - Generate quality statistics and summaries for reporting purposes
+
+        2. Quality Analysis Capabilities:
+           - Fetch all quality results or filter by specific criteria (passed, failed, high-risk)
+           - Look up quality results for specific production lots
+           - Analyze defect patterns by querying results filtered by defect type (Scratch, Particle, Pattern, etc.)
+           - Calculate quality KPIs including pass rates, average yield, and risk distribution
+
+        3. Task Execution Strategy:
+           a. Single Agent Delegation: If a quality-related task can be addressed by a specialized peer agent, delegate appropriately.
+           b. Multi-Agent Coordination: For complex quality analysis requiring multiple data sources, coordinate with other agents (e.g., Operators agents for operator-quality correlation).
+           c. Direct Execution: Execute quality queries and analysis tasks directly using available tools.
+           d. If the task requests data for a range of values (e.g., lot_id 1234 to 1240) and the agent_card only provides a single-value lookup function (e.g., get_result_by_lot_id(lot_id)), handle this by looping through each value in the range and invoking the function once per iteration. Aggregate the results before returning them to the user.
+
+        4. Artifact Management Guidelines:
+           - If an artifact was created during the task (quality reports, analysis results), use `list_artifacts` to get details.
+           - Return important artifacts to the user using artifact_return embed.
+           - Provide regular progress updates by including «status_update:Your message here» in your text responses, especially before initiating any tool call. Note: This is an embed directive in your response text, NOT a function to call.
+           - Always respond in English regardless of the input language, but keep data extracted from databases in its original format (English).
+        
+        Available Quality Operations:
+        - get_result_by_id: Fetch a specific quality result by its unique ID
+        - get_all_results: Retrieve all quality inspection results
+        - get_passed_results: Get all quality results that passed inspection
+        - get_failed_results: Get all quality results that failed inspection
+        - get_high_risk_results: Get quality results flagged as high risk
+        - get_result_by_lot_id: Look up quality result for a specific production lot
+        - get_results_by_defect_type: Filter results by defect type (Scratch, Particle, Pattern, etc.)
+        - get_quality_summary: Get comprehensive summary with derived metrics for a result
+        - get_quality_statistics: Calculate aggregate statistics (pass rate, average yield, etc.)
+      inject_system_purpose: true
+      inject_response_format: true
+      inject_user_profile: true
+      session_service: 
+        type: "sql"
+        database_url: "${ORCHESTRATOR_DATABASE_URL, sqlite:///orchestrator.db}"
+        default_behavior: "PERSISTENT"
+      artifact_service: *default_artifact_service
+      artifact_handling_mode: "reference" 
+      enable_embed_resolution: true 
+      enable_artifact_content_instruction: true 
+      data_tools_config: *default_data_tools_config
+      tools: 
+        - group_name: artifact_management
+          tool_type: builtin-group
+        - tool_type: builtin-group
+          group_name: "data_analysis"
+
+      agent_card:
+        description: "Quality Orchestrator Agent for SECOM MES. Manages quality inspection data, analyzes pass/fail results, tracks defects, calculates quality KPIs, and coordinates quality-related workflows across the manufacturing execution system."
+        defaultInputModes: [text]
+        defaultOutputModes: [text, file, object]
+        skills:
+        - id: quality_result_retrieval
+          name: Quality Result Retrieval
+          description: Retrieves quality inspection results from the SECOM MES database by various criteria including result ID, lot ID, pass/fail status, risk level, or defect type. Supports fetching individual results or complete result sets.
+
+        - id: quality_filtering
+          name: Quality Filtering and Analysis
+          description: Filters quality results by status (passed/failed), risk level (high-risk), or defect type (Scratch, Particle, Pattern, Contamination, Crack). Enables targeted quality analysis and trend identification.
+
+        - id: quality_statistics
+          name: Quality Statistics and KPIs
+          description: Calculates aggregate quality statistics including total results count, pass/fail counts, high-risk counts, pass rate percentage, and average yield. Generates quality KPIs for dashboards and reporting.
+
+        - id: lot_quality_lookup
+          name: Lot Quality Lookup
+          description: Looks up quality inspection results for specific production lots by lot ID. Enables tracing lot quality history and verifying lot quality status.
+
+        - id: defect_analysis
+          name: Defect Pattern Analysis
+          description: Analyzes defect patterns by filtering results by defect type. Supports identification of equipment or process issues related to specific defect categories (Scratch, Particle, Pattern, etc.).
+
+        - id: quality_reporting
+          name: Quality Reporting
+          description: Generates comprehensive quality summaries and reports with derived metrics including pass/fail status, risk assessment, and defect indicators. Creates quality artifacts for stakeholder communication.
+
+      agent_card_publishing: 
+        interval_seconds: 10
+      agent_discovery: 
+        enabled: true
+      inter_agent_communication:
+        allow_list: ["GetAllQualityResults","GetFailedQualityResults","GetHighRiskQualityResults","GetPassedQualityResults","GetQualityResultByID","GetQualityResultByLotID","GetResultsByDefectType"]
+
+        request_timeout_seconds: 600

@@ -1,0 +1,120 @@
+# Solace Agent Mesh Agent Configuration
+
+log:
+  stdout_log_level: INFO
+  log_file_level: DEBUG
+  log_file: a2a_agent.log
+
+!include ../shared_config.yaml
+
+apps:
+  - name: "GetFailedQualityResults.__app"
+    app_base_path: .
+    app_module: solace_agent_mesh.agent.sac.app
+    broker:
+      <<: *broker_connection
+
+    app_config:
+      namespace: "${NAMESPACE}"
+      supports_streaming: true
+      agent_name: "GetFailedQualityResults"
+      display_name: "Get failed quality results"
+      model: *general_model 
+
+      instruction: |
+        Returns all quality inspection results that failed inspection from the SECOM MES database.
+      
+      tools: 
+        - component_base_path: .
+          component_module: src.quality.quality_api
+          function_name: get_failed_results
+          tool_description: Returns a list of all quality inspection results in the SECOM MES database.
+          tool_name: get_failed_results
+          tool_type: python
+
+      session_service: 
+        type: "sql"
+        default_behavior: "PERSISTENT"
+        database_url: "${GET_ALL_OPERATORS._DATABASE_URL, sqlite:///get_failed_results.db}"
+      artifact_service: *default_artifact_service
+      
+      artifact_handling_mode: "reference"
+      enable_embed_resolution: true
+      enable_artifact_content_instruction: true
+      data_tools_config: *default_data_tools_config
+
+      # Agent Card Definition
+      agent_card:
+        description: |
+          Returns all quality inspection results that failed inspection from the SECOM MES database.
+        defaultInputModes: [object] 
+        defaultOutputModes: [object] 
+        skills:
+          - description: 'Retrieves all quality inspection results where classification = 1 (Fail).
+                 Essential for failure analysis, identifying quality trends, implementing
+                 corrective actions, and tracking quality improvement initiatives.'
+            id: get_failed_results
+            name: Get Failed Quality Results
+            input_schema:
+              type: object
+              properties:
+                page:
+                  type: integer
+                  format: int32
+                  description: Page number for pagination (0-based index)
+                  default: 0
+                size:
+                  type: integer
+                  format: int32
+                  description: Number of results per page
+                  default: 20
+
+            output_schema:
+              type: object
+              description: Paginated response containing failed quality results (classification = 1)
+              properties:
+                totalPages:
+                  type: integer
+                  format: int32
+                  description: Total number of pages
+                totalElements:
+                  type: integer
+                  format: int64
+                  description: Total number of failed results
+                size:
+                  type: integer
+                  format: int32
+                  description: Page size
+                number:
+                  type: integer
+                  format: int32
+                  description: Current page number (0-based)
+                content:
+                  type: array
+                  description: Array of failed quality results
+                  items:
+                    type: object
+                    description: Quality result with classification = 1 (Fail)
+                numberOfElements:
+                  type: integer
+                  format: int32
+                  description: Number of elements in current page
+                first:
+                  type: boolean
+                  description: Whether this is the first page
+                last:
+                  type: boolean
+                  description: Whether this is the last page
+                empty:
+                  type: boolean
+                  description: Whether the page is empty
+      
+      # Discovery & Communication
+      agent_card_publishing: 
+        interval_seconds: 10
+      agent_discovery: 
+        enabled: true
+      inter_agent_communication:
+        allow_list: []
+        deny_list: [] 
+        request_timeout_seconds: 600
