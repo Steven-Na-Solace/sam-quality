@@ -94,9 +94,9 @@ export PYTHONPATH="/your/project/path:$PYTHONPATH"
 
 ---
 
-## Starting Lots Agents
+## Starting Quality Agents
 
-Launch the Lots Agents using the following command:
+Launch the Quality Agents using the following command:
 
 ```bash
 solace-agent-mesh run
